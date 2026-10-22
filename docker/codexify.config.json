@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "workDir": "/workspace",
+  "port": 3000,
+  "debug": false,
+  "toolLogging": { "mode": "off" },
+  "audit": { "enabled": true, "includeCommandPreview": false },
+  "worktrees": { "allowSetupScript": false },
+  "agentChat": { "enabled": false, "automation": { "enabled": false } },
+  "codexMcp": { "enabled": false },
+  "openaiTunnels": [
+    {
+      "tunnelId": "REPLACE_WITH_YOUR_TUNNEL_ID",
+      "apiKeyRef": "file:/tmp/codexify-secrets/openai-api-key",
+      "clientPath": "/usr/local/bin/tunnel-client-runtime"
+    }
+  ]
+}

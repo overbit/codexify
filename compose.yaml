@@ -1,0 +1,38 @@
+services:
+  codexify:
+    image: ${CODEXIFY_IMAGE:-ghcr.io/overbit/codexify:latest}
+    user: "${CODEXIFY_UID:-1000}:${CODEXIFY_GID:-1000}"
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    mem_limit: ${CODEXIFY_MEMORY_LIMIT:-2g}
+    cpus: ${CODEXIFY_CPU_LIMIT:-2.0}
+    stop_grace_period: 30s
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=256m,mode=1777
+    volumes:
+      - type: bind
+        source: ${CODEXIFY_STATE_DIR:-./state}
+        target: /home/codexify
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${CODEXIFY_WORKSPACE:-./workspace}
+        target: /workspace
+        bind:
+          create_host_path: false
+    secrets:
+      - openai_tunnel_api_key
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Native tunnels are outbound-only: intentionally no published ports.
+
+secrets:
+  openai_tunnel_api_key:
+    file: ${CODEXIFY_TUNNEL_KEY_PATH:-./secrets/openai_tunnel_api_key}
