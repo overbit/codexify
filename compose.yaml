@@ -15,12 +15,12 @@ services:
       - /tmp:rw,nosuid,nodev,size=256m,mode=1777
     volumes:
       - type: bind
-        source: ${CODEXIFY_STATE_DIR:-./state}
+        source: ${CODEXIFY_STATE_DIR:-${HOME:?HOME is required}/.codexify/docker/home}
         target: /home/codexify
         bind:
           create_host_path: false
       - type: bind
-        source: ${CODEXIFY_WORKSPACE:-./workspace}
+        source: ${CODEXIFY_WORKSPACE:-${HOME:?HOME is required}/.codexify/docker/workspace}
         target: /workspace
         bind:
           create_host_path: false
@@ -35,4 +35,4 @@ services:
 
 secrets:
   openai_tunnel_api_key:
-    file: ${CODEXIFY_TUNNEL_KEY_PATH:-./secrets/openai_tunnel_api_key}
+    file: ${CODEXIFY_TUNNEL_KEY_PATH:-${HOME:?HOME is required}/.codexify/docker/secrets/openai_tunnel_api_key}
