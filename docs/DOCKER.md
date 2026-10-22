@@ -46,10 +46,11 @@ Edit `.env`. On ordinary Linux Docker Engine, set `CODEXIFY_UID` and `CODEXIFY_G
 
 Create an OpenAI Secure MCP Tunnel and a least-privilege runtime key using the [manual native tunnel guide](REFERENCE.md#manual-native-openai-tunnel-setup). ChatGPT custom-app access and OpenAI Platform tunnel permissions are separate prerequisites. Replace `REPLACE_WITH_YOUR_TUNNEL_ID` in `$HOME/.codexify/docker/home/.codexify/codexify.config.json` with the actual ID. Leave `clientPath`, `apiKeyRef`, and `workDir` unchanged. JSON paths refer to the container, not the host.
 
-Save the runtime key with a local editor, or use this **Bash** prompt without echoing it or placing its value in shell history:
+Save the runtime key with a local editor, or use this **Bash or Zsh** prompt without echoing it or placing its value in shell history:
 
 ```bash
-read -r -s -p 'Tunnel runtime API key: ' tunnel_key
+printf 'Tunnel runtime API key: '
+IFS= read -rs tunnel_key
 printf '\n'
 printf '%s\n' "$tunnel_key" > "$HOME/.codexify/docker/secrets/openai_tunnel_api_key"
 unset tunnel_key
