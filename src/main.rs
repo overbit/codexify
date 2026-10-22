@@ -6,9 +6,9 @@ use serde::Serialize;
 
 use anyhow::Context;
 use codexify::config::{
-    BrowserCommand, Cli, CliCommand, GithubCommand, ProjectsCommand, ProjectsListArgs, ServiceCommand,
-    config_path_for_quickstart, config_path_for_service, load_config, load_config_quiet,
-    load_config_quiet_read_only, load_project_catalog_for_cli,
+    BrowserCommand, Cli, CliCommand, GithubCommand, ProjectsCommand, ProjectsListArgs,
+    ServiceCommand, config_path_for_quickstart, config_path_for_service, load_config,
+    load_config_quiet, load_config_quiet_read_only, load_project_catalog_for_cli,
 };
 use codexify::doctor;
 use codexify::legacy_migration;
@@ -325,10 +325,17 @@ fn run_github_with_binary(command: GithubCommand, binary: &std::ffi::OsStr) -> a
 
     match command {
         GithubCommand::Login => {
-            println!("GitHub sign-in: copy the device code shown below and authorize it in your browser.");
+            println!(
+                "GitHub sign-in: copy the device code shown below and authorize it in your browser."
+            );
             run(&[
-                "auth", "login", "--hostname", "github.com",
-                "--git-protocol", "https", "--web",
+                "auth",
+                "login",
+                "--hostname",
+                "github.com",
+                "--git-protocol",
+                "https",
+                "--web",
             ])?;
             run(&["auth", "setup-git", "--hostname", "github.com"])?;
             println!("GitHub CLI is authenticated; HTTPS Git credentials are configured.");
@@ -359,12 +366,20 @@ mod github_cli_tests {
     #[test]
     fn github_command_parses_login_and_status() {
         assert!(matches!(
-            Cli::try_parse_from(["codexify", "github", "login"]).unwrap().command,
-            Some(CliCommand::Github { command: GithubCommand::Login })
+            Cli::try_parse_from(["codexify", "github", "login"])
+                .unwrap()
+                .command,
+            Some(CliCommand::Github {
+                command: GithubCommand::Login
+            })
         ));
         assert!(matches!(
-            Cli::try_parse_from(["codexify", "github", "status"]).unwrap().command,
-            Some(CliCommand::Github { command: GithubCommand::Status })
+            Cli::try_parse_from(["codexify", "github", "status"])
+                .unwrap()
+                .command,
+            Some(CliCommand::Github {
+                command: GithubCommand::Status
+            })
         ));
     }
 
