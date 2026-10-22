@@ -116,28 +116,33 @@ is not included.
 git clone https://github.com/overbit/codexify.git
 cd codexify
 umask 077
-mkdir -p state/.codexify workspace secrets
+mkdir -p "$HOME/.codexify/docker/home/.codexify" \
+         "$HOME/.codexify/docker/workspace" \
+         "$HOME/.codexify/docker/secrets"
 cp docker/example.env .env
-cp docker/codexify.config.json state/.codexify/codexify.config.json
+cp docker/codexify.config.json "$HOME/.codexify/docker/home/.codexify/codexify.config.json"
 ```
 
-Edit `.env` to select your workspace (`CODEXIFY_WORKSPACE`, default
-`./workspace`) and set `CODEXIFY_UID` / `CODEXIFY_GID` to `id -u` / `id -g`
-on Linux. The selected user must be able to write the state and workspace
-directories and read the secret file.
+By default, persistent state, projects, and the tunnel secret live under
+`$HOME/.codexify/docker/{home,workspace,secrets}` on the **host OS**, not
+inside the cloned repository. The whole host home is **not** mounted. Set
+`CODEXIFY_UID` / `CODEXIFY_GID` in `.env` to `id -u` / `id -g` on Linux.
+To use existing projects elsewhere, set `CODEXIFY_WORKSPACE` to their
+**absolute host path**. The selected user needs write access to state and
+workspace, and read access to the secret file.
 
 Create an OpenAI Secure MCP Tunnel and a scoped runtime key using the
 [manual tunnel setup guide](docs/REFERENCE.md#manual-native-openai-tunnel-setup).
 Replace `REPLACE_WITH_YOUR_TUNNEL_ID` in
-`state/.codexify/codexify.config.json`. Save the key as a private file
+`$HOME/.codexify/docker/home/.codexify/codexify.config.json`. Save the key as a private file
 (not in `.env` or Git); for example, in **Bash**:
 
 ```bash
 read -r -s -p 'Tunnel runtime API key: ' tunnel_key
 printf '\n'
-printf '%s\n' "$tunnel_key" > secrets/openai_tunnel_api_key
+printf '%s\n' "$tunnel_key" > "$HOME/.codexify/docker/secrets/openai_tunnel_api_key"
 unset tunnel_key
-chmod 600 secrets/openai_tunnel_api_key
+chmod 600 "$HOME/.codexify/docker/secrets/openai_tunnel_api_key"
 ```
 
 Validate and start the container:
@@ -155,8 +160,9 @@ If the GHCR image has not been published yet, build it with
 `.env`, and skip `docker compose pull`. Docker does not use
 `codexify quickstart` or `codexify update`; finish the ChatGPT connector
 setup through the manual tunnel guide linked above. No inbound ports are
-required. See the [Docker deployment guide](docs/DOCKER.md) for permissions,
-troubleshooting, upgrades, and security limits.
+required. Existing deployments with checkout-relative paths keep working if
+those paths are still set in `.env`; see the [Docker deployment guide](docs/DOCKER.md)
+for migration, permissions, troubleshooting, upgrades, and security limits.
 
 ### 2. Connect to ChatGPT
 
