@@ -34,7 +34,12 @@ def main(image):
             assert docker("run", "--rm", "--network", "none", image, check=False).returncode != 0
             version = docker("run", "--rm", "--network", "none", "--entrypoint",
                              "/usr/local/bin/tunnel-client-runtime", image, "--version")
-            assert "0.0.12" in version.stdout + version.stderr
+            # The archive release tag and executable's internal version differ.
+            # install-tunnel.sh verifies the exact archive with its pinned SHA-256;
+            # here verify that the packaged executable actually runs on this CPU.
+            version_text = (version.stdout + version.stderr).strip()
+            assert version_text, "The bundled tunnel executable produced no version output"
+            print(f"Bundled tunnel runtime: {version_text}", flush=True)
             docker("volume", "create", home)
             docker("volume", "create", workspace)
             docker("run", "-d", "--name", container, "--network", "none", "--read-only",
@@ -61,7 +66,7 @@ def main(image):
                 grep -Eq '^CapEff:[[:space:]]+0+$' /proc/self/status
                 grep -Eq '^NoNewPrivs:[[:space:]]+1$' /proc/self/status
                 test ! -S /var/run/docker.sock
-                ! touch /usr/local/bin/must-not-be-writable
+                if touch /usr/local/bin/must-not-be-writable 2>/dev/null; then exit 1; fi
                 test "$(stat -c %a /tmp/codexify-secrets/openai-api-key)" = 600
                 test "$(stat -c %a /tmp/codexify-secrets)" = 700
                 printf persisted > /home/codexify/persistence-check
