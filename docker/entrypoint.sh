@@ -10,8 +10,16 @@ fail() {
 export CODEXIFY_CONFIG="${CODEXIFY_CONFIG:-$HOME/.codexify/codexify.config.json}"
 case "${1:-}" in
     -h|--help) exec codexify "$@" ;;
-    quickstart|service|update|browser)
-        fail 'Use a configured foreground server in this image; see docs/DOCKER.md.' ;;
+    config|doctor|projects|chat) ;;
+    *)
+        # One configuration source keeps startup checks and health probes aligned.
+        # In particular, --config/--port/--api-key must not bypass the checked file.
+        for arg in "$@"; do
+            case "$arg" in
+                -v|-vv|-vvv|--verbose) ;;
+                *) fail 'Use the JSON configuration for server options; only -v/--verbose, config, doctor, projects, chat, and --help are supported.' ;;
+            esac
+        done ;;
 esac
 
 # Compose file-backed secrets do not consistently support uid/mode overrides.
@@ -41,7 +49,7 @@ esac
 # unauthenticated HTTP server in a deployment image. Full validation stays in Rust.
 jq -e '
     type == "object" and (
-        (.apiKey | type == "string" and length > 0) or
+        (.apiKey | type == "string" and test("\\S")) or
         (.openaiTunnels | type == "array" and length > 0)
     )
 ' "$CODEXIFY_CONFIG" >/dev/null || fail 'Configure openaiTunnels or a non-empty apiKey before starting.'
