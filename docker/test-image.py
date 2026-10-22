@@ -14,6 +14,39 @@ def docker(*args, check=True):
                           text=True, timeout=90)
 
 
+def rpc_result(body, request_id):
+    """Read a JSON-RPC result from JSON or an SSE response, including priming events."""
+    if body.lstrip().startswith("{"):
+        candidates = [body]
+    else:
+        candidates = []
+        data = []
+        for line in body.splitlines() + [""]:
+            if not line:
+                if data:
+                    candidates.append("\n".join(data))
+                    data = []
+            elif line.startswith("data:"):
+                # SSE removes at most one optional space after the field colon.
+                value = line[5:]
+                data.append(value[1:] if value.startswith(" ") else value)
+    for candidate in candidates:
+        if not candidate.strip():
+            continue
+        try:
+            message = json.loads(candidate)
+        except json.JSONDecodeError as error:
+            raise AssertionError("Malformed JSON in MCP response") from error
+        if not isinstance(message, dict) or message.get("id") != request_id:
+            continue
+        if "error" in message:
+            raise AssertionError(f"MCP request failed: {message['error']}")
+        if "result" not in message:
+            raise AssertionError("MCP response has no result")
+        return message["result"]
+    raise AssertionError(f"No MCP response matched request {request_id}")
+
+
 def main(image):
     prefix = "codexify-smoke-" + uuid.uuid4().hex[:12]
     home, workspace = prefix + "-home", prefix + "-workspace"
@@ -103,12 +136,7 @@ def main(image):
                               "http://127.0.0.1:3000/mcp").stdout
                 if request_id is None:
                     return None
-                text = body.strip()
-                if not text.startswith("{"):
-                    text = next(line[5:].strip() for line in body.splitlines() if line.startswith("data:"))
-                result = json.loads(text)
-                assert "error" not in result, result
-                return result["result"]
+                return rpc_result(body, request_id)
 
             initialized = rpc("initialize", {"protocolVersion": "2025-03-26", "capabilities": {},
                               "clientInfo": {"name": "container-smoke", "version": "1"}}, 1)
