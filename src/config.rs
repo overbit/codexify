@@ -191,6 +191,11 @@ pub enum CliCommand {
     Config(ConfigArgs),
     /// Diagnose the local Codexify installation without changing it.
     Doctor(DoctorArgs),
+    /// Authenticate GitHub CLI and configure Git credentials.
+    Github {
+        #[command(subcommand)]
+        command: GithubCommand,
+    },
     /// Download and verify the latest release, then update this installation.
     /// A running background service is restarted after the verified replacement.
     Update,
@@ -262,6 +267,14 @@ pub struct DoctorArgs {
     /// Emit one stable machine-readable JSON document.
     #[arg(long)]
     pub json: bool,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum GithubCommand {
+    /// Sign in using a GitHub device code and configure Git over HTTPS.
+    Login,
+    /// Show the current GitHub CLI authentication status.
+    Status,
 }
 
 #[derive(Subcommand, Debug)]

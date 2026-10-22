@@ -113,6 +113,14 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("validate", result.stdout)
 
+    def test_github_commands_do_not_require_server_configuration(self):
+        self.config.unlink()
+        self.secret.unlink()
+        self.env.pop("CODEXIFY_TUNNEL_API_KEY_FILE")
+        result = self.run_entrypoint("github", "status")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("github\nstatus", result.stdout)
+
     def test_server_overrides_cannot_bypass_checked_configuration(self):
         for args in (("--config", "/other.json"), ("--config=/other.json",),
                      ("--port=4000",), ("--api-key=",), ("-v", "quickstart"),

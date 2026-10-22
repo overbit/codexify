@@ -17,14 +17,14 @@ unset CODEXIFY_TUNNEL_API_KEY
 export CODEXIFY_CONFIG="${CODEXIFY_CONFIG:-$HOME/.codexify/codexify.config.json}"
 case "${1:-}" in
     -h|--help) exec codexify "$@" ;;
-    config|doctor|projects|chat) ;;
+    config|doctor|projects|chat|github) ;;
     *)
         # One configuration source keeps startup checks and health probes aligned.
         # In particular, --config/--port/--api-key must not bypass the checked file.
         for arg in "$@"; do
             case "$arg" in
                 -v|-vv|-vvv|--verbose) ;;
-                *) fail 'Use the JSON configuration for server options; only -v/--verbose, config, doctor, projects, chat, and --help are supported.' ;;
+                *) fail 'Use the JSON configuration for server options; only -v/--verbose, config, doctor, github, projects, chat, and --help are supported.' ;;
             esac
         done ;;
 esac
@@ -92,7 +92,7 @@ if [ -n "${CODEXIFY_TUNNEL_ID+x}" ]; then
 fi
 
 case "${1:-}" in
-    config|doctor|projects|chat) exec codexify "$@" ;;
+    config|doctor|projects|chat|github) exec codexify "$@" ;;
 esac
 
 [ -f "$CODEXIFY_CONFIG" ] || fail "Set CODEXIFY_TUNNEL_ID and provide a runtime key, or mount a configuration at $CODEXIFY_CONFIG; see docs/DOCKER.md."

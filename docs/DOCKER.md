@@ -112,6 +112,37 @@ the named-volume options with bind mounts of `$HOME/.codexify/docker/home` to
 Use `--mount type=bind,src=...,dst=...` so a missing source fails instead of
 being created as root. New named volumes do not import existing data.
 
+## GitHub authentication
+
+GitHub CLI (`gh`) is installed in the Docker image but starts unauthenticated.
+To sign in without putting a GitHub token in command history or ChatGPT, run
+the following **on the Docker host** after the container is running:
+
+```sh
+docker exec -it codexify codexify github login
+```
+
+Codexify launches the GitHub device authorization flow. Copy the one-time
+code shown in the terminal, open [github.com/login/device](https://github.com/login/device)
+in your normal browser, and approve access. GitHub CLI may try to open a
+browser inside the headless container; use the URL on your host instead.
+On success, Codexify configures Git's HTTPS credential helper automatically.
+Check the active account without changing credentials:
+
+```sh
+docker exec codexify codexify github status
+```
+
+The GitHub CLI account and Git helper configuration are stored under the
+container user's `/home/codexify`, backed by the `codexify-home` volume.
+Authentication survives container recreation as long as you retain that volume.
+This authorizes GitHub repository operations, **not** the separate OpenAI MCP
+tunnel. GitHub CLI may fall back to storing its token in a plaintext file when
+the container has no credential store. The coding agent, which runs as the same
+user, can access those credentials; use a suitably scoped GitHub account.
+To revoke access, use `docker exec -it codexify gh auth logout -h github.com`
+and revoke the authorization in GitHub settings if appropriate.
+
 ## Operations
 
 ```sh

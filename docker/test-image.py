@@ -96,6 +96,10 @@ def main(image):
             checks = {check["id"]: check for check in json.loads(report.stdout)["checks"]}
             assert checks["gh"]["status"] == "pass", checks["gh"]
             print("PASS: Codexify Doctor finds a usable GitHub CLI")
+            login = docker("exec", container, "codexify", "github", "login", check=False)
+            assert login.returncode != 0
+            assert "interactive terminal" in login.stderr
+            print("PASS: GitHub login requires an interactive terminal instead of attempting unattended authorization")
             assert docker("exec", container, "id", "-u").stdout.strip() == "1000"
             docker("exec", container, "sh", "-ec", """
                 grep -Eq '^CapEff:[[:space:]]+0+$' /proc/self/status
