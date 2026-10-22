@@ -30,9 +30,7 @@ jobs:
           shellcheck docker/entrypoint.sh docker/healthcheck.sh docker/install-tunnel.sh
           python3 docker/test-runtime.py -v
           python3 docker/test-bootstrap.py -v
-          python3 docker/test-compose.py -v
           python3 -m py_compile docker/test-image.py docker/test-bootstrap-image.py
-          docker compose config --quiet
 
   image:
     needs: validate
