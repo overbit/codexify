@@ -36,12 +36,21 @@ case "${1:-}" in
     config|doctor|projects|chat) exec codexify "$@" ;;
 esac
 
+# Keep the server, authentication guard, and health check on the same config.
+# In particular, --config and --api-key must not bypass the startup guard.
+for argument do
+    case "$argument" in
+        -v|--verbose|--log-tool-calls) ;;
+        *) fail 'Set server options in CODEXIFY_CONFIG; only verbosity flags are accepted at startup.' ;;
+    esac
+done
+
 [ -f "$CODEXIFY_CONFIG" ] || fail "Mount a configuration at $CODEXIFY_CONFIG; see docs/DOCKER.md."
-# A missing config is legal for the native CLI, but must not silently start an
-# unauthenticated HTTP server in a deployment image. Full validation stays in Rust.
+# Full schema and tunnel validation stays in Rust. Never silently start the
+# native CLI's otherwise-legal unauthenticated HTTP default in a deployment.
 jq -e '
     type == "object" and (
-        (.apiKey | type == "string" and length > 0) or
+        (.apiKey | type == "string" and test("[^[:space:]]")) or
         (.openaiTunnels | type == "array" and length > 0)
     )
 ' "$CODEXIFY_CONFIG" >/dev/null || fail 'Configure openaiTunnels or a non-empty apiKey before starting.'

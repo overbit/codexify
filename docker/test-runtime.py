@@ -49,7 +49,8 @@ class RuntimeTests(unittest.TestCase):
         self.assertNotIn("CODEXIFY_CALLED", result.stdout)
 
     def test_unauthenticated_or_invalid_configuration_fails(self):
-        for value in ({}, {"apiKey": ""}, {"openaiTunnels": []}, [], None):
+        for value in ({}, {"apiKey": ""}, {"apiKey": " \t"}, {"apiKey": None},
+                      {"openaiTunnels": []}, [], None):
             with self.subTest(value=value):
                 self.config.write_text(json.dumps(value))
                 result = self.run_entrypoint()
@@ -105,6 +106,15 @@ class RuntimeTests(unittest.TestCase):
         for command in ("quickstart", "service", "update", "browser"):
             with self.subTest(command=command):
                 self.assertNotEqual(self.run_entrypoint(command).returncode, 0)
+
+    def test_server_overrides_cannot_bypass_authentication_or_healthcheck(self):
+        for args in (("--config", "/other.json"), ("--api-key", ""),
+                     ("--port=3001",), ("-v", "service", "start"),
+                     ("--openai-tunnel-id", "tunnel_" + "a" * 32)):
+            with self.subTest(args=args):
+                result = self.run_entrypoint(*args)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertNotIn("CODEXIFY_CALLED", result.stdout)
 
     def test_configuration_commands_remain_available(self):
         self.config.write_text("{}")
