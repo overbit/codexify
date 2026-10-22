@@ -39,6 +39,7 @@ LABEL org.opencontainers.image.title="Codexify" \
 COPY --from=build /out/codexify /out/tunnel-client-runtime /usr/local/bin/
 COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/codexify-entrypoint
 COPY --chmod=755 docker/healthcheck.sh /usr/local/bin/codexify-healthcheck
+COPY docker/codexify.config.json /etc/codexify/codexify.config.json
 COPY LICENSE THIRD_PARTY_NOTICES.md /usr/share/doc/codexify/
 COPY LICENSES /usr/share/doc/codexify/LICENSES
 ENV HOME=/home/codexify \

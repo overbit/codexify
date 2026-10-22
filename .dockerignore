@@ -11,6 +11,7 @@
 !docker/entrypoint.sh
 !docker/healthcheck.sh
 !docker/install-tunnel.sh
+!docker/codexify.config.json
 !LICENSE
 !LICENSES/
 !LICENSES/**
