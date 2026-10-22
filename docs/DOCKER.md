@@ -21,30 +21,42 @@ For another fork, the workflow derives the image name from that repository. Set 
 
 ## Configure and start
 
-From a checkout, or a deployment directory containing `compose.yaml`, `docker/example.env`, and `docker/codexify.config.json` with their relative paths preserved, run as your normal **non-root** user:
+From a checkout, or a deployment directory containing `compose.yaml`, `docker/example.env`, and `docker/codexify.config.json`, run as your normal **non-root** user. Compose uses the invoking user's **host OS `HOME`**, not the checkout directory, for all default bind mounts and the tunnel key:
+
+```text
+$HOME/.codexify/docker/
+  home/       Container home, configuration, persistent state
+  workspace/  Dedicated projects accessible to Codexify
+  secrets/    Tunnel runtime key, mounted as a Compose secret
+```
+
+Create these folders under your home directory and copy the sample configuration:
 
 ```sh
 umask 077
-mkdir -p state/.codexify workspace secrets
+mkdir -p "$HOME/.codexify/docker/home/.codexify" \
+         "$HOME/.codexify/docker/workspace" \
+         "$HOME/.codexify/docker/secrets"
+chmod 700 "$HOME/.codexify/docker" "$HOME/.codexify/docker/home" "$HOME/.codexify/docker/secrets"
 cp docker/example.env .env
-cp docker/codexify.config.json state/.codexify/codexify.config.json
+cp docker/codexify.config.json "$HOME/.codexify/docker/home/.codexify/codexify.config.json"
 ```
 
-Edit `.env`. On ordinary Linux Docker Engine, set `CODEXIFY_UID` and `CODEXIFY_GID` to the values reported by `id -u` and `id -g`; both default to `1000`. Keep them nonzero. Set `CODEXIFY_WORKSPACE` to a dedicated directory containing only projects Codexify should access, or keep `./workspace`. The selected identity must be able to write the state and workspace directories. The image does not start as root to change host ownership.
+Edit `.env`. On ordinary Linux Docker Engine, set `CODEXIFY_UID` and `CODEXIFY_GID` to the values reported by `id -u` and `id -g`; both default to `1000`. Keep them nonzero. To use a different project directory, set `CODEXIFY_WORKSPACE` to its **absolute host path**, and mount only projects Codexify should access. The selected identity must be able to write the persistent state and workspace directories. The image does not start as root to change host ownership.
 
-Create an OpenAI Secure MCP Tunnel and a least-privilege runtime key using the [manual native tunnel guide](REFERENCE.md#manual-native-openai-tunnel-setup). ChatGPT custom-app access and OpenAI Platform tunnel permissions are separate prerequisites. Replace `REPLACE_WITH_YOUR_TUNNEL_ID` in `state/.codexify/codexify.config.json` with the actual ID. Leave `clientPath`, `apiKeyRef`, and `workDir` unchanged. JSON paths refer to the container, not the host.
+Create an OpenAI Secure MCP Tunnel and a least-privilege runtime key using the [manual native tunnel guide](REFERENCE.md#manual-native-openai-tunnel-setup). ChatGPT custom-app access and OpenAI Platform tunnel permissions are separate prerequisites. Replace `REPLACE_WITH_YOUR_TUNNEL_ID` in `$HOME/.codexify/docker/home/.codexify/codexify.config.json` with the actual ID. Leave `clientPath`, `apiKeyRef`, and `workDir` unchanged. JSON paths refer to the container, not the host.
 
 Save the runtime key with a local editor, or use this **Bash** prompt without echoing it or placing its value in shell history:
 
 ```bash
 read -r -s -p 'Tunnel runtime API key: ' tunnel_key
 printf '\n'
-printf '%s\n' "$tunnel_key" > secrets/openai_tunnel_api_key
+printf '%s\n' "$tunnel_key" > "$HOME/.codexify/docker/secrets/openai_tunnel_api_key"
 unset tunnel_key
-chmod 600 secrets/openai_tunnel_api_key
+chmod 600 "$HOME/.codexify/docker/secrets/openai_tunnel_api_key"
 ```
 
-Do not put the key in the image, Dockerfile, `.env`, Git, command arguments, or a ChatGPT message. The host key file must be readable by the selected container UID. Deployment state and credentials are gitignored, and the Docker build context uses an explicit allowlist.
+Do not put the key in the image, Dockerfile, `.env`, Git, command arguments, or a ChatGPT message. The host key file must be readable by the selected container UID. The deployment's `.env` remains gitignored in the checkout; state and credentials live under the host home, outside the Docker build context. The build uses an explicit allowlist.
 
 Validate and start:
 
@@ -67,17 +79,17 @@ The example disables agent chat/browser automation, host Codex CLI MCP imports, 
 | --- | --- | --- |
 | `CODEXIFY_IMAGE` | `ghcr.io/overbit/codexify:latest` | Image tag or immutable digest |
 | `CODEXIFY_UID`, `CODEXIFY_GID` | `1000`, `1000` | Container process identity |
-| `CODEXIFY_STATE_DIR` | `./state` | Dedicated persistent container home |
-| `CODEXIFY_WORKSPACE` | `./workspace` | Projects accessible to the tools |
-| `CODEXIFY_TUNNEL_KEY_PATH` | `./secrets/openai_tunnel_api_key` | Host secret file |
+| `CODEXIFY_STATE_DIR` | `$HOME/.codexify/docker/home` | Dedicated persistent container home |
+| `CODEXIFY_WORKSPACE` | `$HOME/.codexify/docker/workspace` | Projects accessible to the tools |
+| `CODEXIFY_TUNNEL_KEY_PATH` | `$HOME/.codexify/docker/secrets/openai_tunnel_api_key` | Host secret file |
 | `CODEXIFY_MEMORY_LIMIT` | `2g` | Memory limit |
 | `CODEXIFY_CPU_LIMIT` | `2.0` | CPU limit |
 
-Relative paths resolve from the Compose project directory. Missing bind sources are rejected rather than silently created as root-owned directories.
+Compose expands `HOME` from the **host shell** and rejects missing `HOME` when using default paths. Run Compose from your normal user session (not `sudo`, which may change `HOME`). For Windows, use Docker Desktop with a WSL Linux shell and its `HOME`. Optional path overrides should be absolute; existing relative overrides still resolve from the Compose project directory. Missing bind sources are rejected rather than silently created as root-owned directories.
 
 ## State, permissions, and secrets
 
-The dedicated `state/` directory mounts at `/home/codexify`, including `.codexify` configuration/settings and `.codex` worktree state. The workspace mounts separately at `/workspace`. Both survive container replacement. Back up both together; state and worktree links can reference paths in each.
+The dedicated `$HOME/.codexify/docker/home/` directory mounts at `/home/codexify`, including `.codexify` configuration/settings and `.codex` worktree state. `$HOME/.codexify/docker/workspace/` mounts separately at `/workspace`. Both survive container replacement. Back up both together; state and worktree links can reference paths in each.
 
 Mount the state **directory**, not only a read-only configuration file. Native settings updates and schema migrations use atomic replacement and may create adjacent backups. Never mount your actual host home as the container home. Existing linked Git worktrees containing host-absolute paths may not work; use a normal clone or create worktrees inside the container.
 
@@ -94,6 +106,24 @@ docker compose up -d --force-recreate codexify
 With a custom Compose definition, `CODEXIFY_CONFIG` selects a different in-container configuration path and `CODEXIFY_TUNNEL_API_KEY_FILE` selects the in-container source secret path. The latter is different from the host-path setting `CODEXIFY_TUNNEL_KEY_PATH`. Changing `TMPDIR` also requires updating the JSON `apiKeyRef`. Additional native tunnels may use explicitly mounted private files and native `file:` references; all configured tunnels share the instance's project access.
 
 Server options belong in JSON. The wrapper rejects `--config`, `--port`, and `--api-key` server overrides so its authentication check, health probe, and running server cannot silently use different configurations. `-v`/`--verbose` and the `config`, `doctor`, `projects`, and `chat` subcommands remain available. Supporting a command does not enable an integration disabled by the example configuration.
+
+### Migrating an existing checkout-relative deployment
+
+Previous examples used `./state`, `./workspace`, and `./secrets`. Any paths explicitly saved in an existing `.env` **continue to work**; this update never moves, deletes, or silently replaces their data. To switch to the home-based defaults, back up your data, stop the container, and copy the old contents:
+
+```sh
+docker compose down
+umask 077
+mkdir -p "$HOME/.codexify/docker/home" \
+         "$HOME/.codexify/docker/workspace" \
+         "$HOME/.codexify/docker/secrets"
+cp -a state/. "$HOME/.codexify/docker/home/"
+cp -a workspace/. "$HOME/.codexify/docker/workspace/"
+cp -a secrets/openai_tunnel_api_key "$HOME/.codexify/docker/secrets/openai_tunnel_api_key"
+chmod 600 "$HOME/.codexify/docker/secrets/openai_tunnel_api_key"
+```
+
+These commands assume the old paths still point to checkout-relative directories; do not copy blindly if your `.env` already uses custom paths. Remove or comment out the old `CODEXIFY_STATE_DIR`, `CODEXIFY_WORKSPACE`, and `CODEXIFY_TUNNEL_KEY_PATH` entries in `.env`, then verify with `docker compose config`, restart with `docker compose up -d`, and check your existing projects and settings. Retain the original files until the migration has been verified. Worktrees with absolute host paths may need repair.
 
 ## Security boundary
 
@@ -142,11 +172,12 @@ For production, select a reviewed `ghcr.io/overbit/codexify@sha256:<digest>` rat
 
 ```sh
 python3 docker/test-runtime.py -v
+python3 docker/test-compose.py -v
 docker build -t codexify:test .
 python3 docker/test-image.py codexify:test
 ```
 
-The wrapper tests need Python 3, POSIX shell, jq, and curl. The image test requires Docker and runs without network access or real OpenAI credentials. It checks missing-configuration failure, the bundled tunnel executable, authenticated MCP initialization/tool discovery, rejected unauthenticated access, non-root identity, filesystem/capability restrictions, secret permissions, Git, persistent state after restart, SIGTERM forwarding without forced termination, and custom UID/GID configuration validation. It does not validate a live OpenAI tunnel or a browser session; verify your connector with a restricted project before production use.
+The wrapper tests need Python 3, POSIX shell, jq, and curl. The Compose path tests additionally require Docker Compose v2; they check default host-home mounts, absolute overrides, and rejection of missing `HOME`. The image test requires Docker and runs without network access or real OpenAI credentials. It checks missing-configuration failure, the bundled tunnel executable, authenticated MCP initialization/tool discovery, rejected unauthenticated access, non-root identity, filesystem/capability restrictions, secret permissions, Git, persistent state after restart, SIGTERM forwarding without forced termination, and custom UID/GID configuration validation. It does not validate a live OpenAI tunnel or a browser session; verify your connector with a restricted project before production use.
 
 The multi-stage build uses `cargo build --locked` and a versioned Rust builder. Base tags and distribution repositories remain mutable, so this is not a claim of bit-for-bit reproducibility. `RUST_IMAGE` and `RUNTIME_IMAGE` accept approved digest-pinned references. A tunnel version/hash mismatch with the Rust source fails the image build until its installer pins are updated.
 
