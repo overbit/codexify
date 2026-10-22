@@ -20,7 +20,7 @@ workflow uses your ChatGPT allowance, leaving your Codex/Work quota untouched.
 > still apply. If you explicitly invoke Codex, Work, or another metered service
 > through connected tools, that service's usage counts normally.
 
-[Get started](#get-started) · [Documentation](#documentation) · [Website](https://codexify.dev) · [Downloads](https://github.com/devnoname120/codexify/releases/latest)
+[Get started](#get-started) · [Docker](#docker-headless-mcp-server) · [Documentation](#documentation) · [Website](https://codexify.dev) · [Downloads](https://github.com/devnoname120/codexify/releases/latest)
 
 ## ChatGPT plan comparison
 
@@ -105,7 +105,62 @@ standard installation. A running background service is restarted after the
 verified replacement; a stopped service stays stopped. The command reports when
 the installation is already up to date and never downgrades a newer version.
 
+#### Docker (headless MCP server)
+
+Use **Docker Engine with Compose v2** (or Docker Desktop with Linux containers)
+instead of installing the native CLI and background service. This runs the
+headless MCP tools and outbound OpenAI tunnel; the desktop/browser companion
+is not included.
+
+```sh
+git clone https://github.com/overbit/codexify.git
+cd codexify
+umask 077
+mkdir -p state/.codexify workspace secrets
+cp docker/example.env .env
+cp docker/codexify.config.json state/.codexify/codexify.config.json
+```
+
+Edit `.env` to select your workspace (`CODEXIFY_WORKSPACE`, default
+`./workspace`) and set `CODEXIFY_UID` / `CODEXIFY_GID` to `id -u` / `id -g`
+on Linux. The selected user must be able to write the state and workspace
+directories and read the secret file.
+
+Create an OpenAI Secure MCP Tunnel and a scoped runtime key using the
+[manual tunnel setup guide](docs/REFERENCE.md#manual-native-openai-tunnel-setup).
+Replace `REPLACE_WITH_YOUR_TUNNEL_ID` in
+`state/.codexify/codexify.config.json`. Save the key as a private file
+(not in `.env` or Git); for example, in **Bash**:
+
+```bash
+read -r -s -p 'Tunnel runtime API key: ' tunnel_key
+printf '\n'
+printf '%s\n' "$tunnel_key" > secrets/openai_tunnel_api_key
+unset tunnel_key
+chmod 600 secrets/openai_tunnel_api_key
+```
+
+Validate and start the container:
+
+```sh
+docker compose config --quiet
+docker compose pull
+docker compose run --rm codexify config validate
+docker compose up -d
+docker compose ps
+```
+
+If the GHCR image has not been published yet, build it with
+`docker build -t codexify:local .`, set `CODEXIFY_IMAGE=codexify:local` in
+`.env`, and skip `docker compose pull`. Docker does not use
+`codexify quickstart` or `codexify update`; finish the ChatGPT connector
+setup through the manual tunnel guide linked above. No inbound ports are
+required. See the [Docker deployment guide](docs/DOCKER.md) for permissions,
+troubleshooting, upgrades, and security limits.
+
 ### 2. Connect to ChatGPT
+
+For a **native installation**, run the setup wizard (Docker users should skip it):
 
 ```sh
 codexify quickstart
@@ -563,6 +618,7 @@ Report reproducible bugs in [GitHub Issues](https://github.com/devnoname120/code
 | Looking for... | Read |
 | --- | --- |
 | Setup and usage guides | [Wiki](https://github.com/devnoname120/codexify/wiki) |
+| Docker installation and operations | [Docker deployment guide](docs/DOCKER.md) |
 | CLI options, configuration, and tool behavior | [Technical reference](docs/REFERENCE.md) |
 | Additional MCP servers and reusable workflows | [MCP bridging](docs/REFERENCE.md#bridging-other-mcp-servers) · [Skills](docs/REFERENCE.md#skills) |
 | Building or contributing | [Architecture](docs/ARCHITECTURE.md) · [Development commands](docs/REFERENCE.md#dev-commands) |
