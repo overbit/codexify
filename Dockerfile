@@ -21,7 +21,7 @@ RUN sh /tmp/install-tunnel.sh "$TARGETARCH"
 FROM ${RUNTIME_IMAGE} AS runtime
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        bash ca-certificates curl git jq openssh-client ripgrep tini \
+        bash ca-certificates curl gh git jq openssh-client ripgrep tini \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 1000 codexify \
     && useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash codexify \

@@ -92,6 +92,10 @@ def main(image):
 
             wait_healthy()
             print("PASS: startup and bundled tunnel runtime work without network access")
+            report = docker("exec", container, "codexify", "doctor", "--json", check=False)
+            checks = {check["id"]: check for check in json.loads(report.stdout)["checks"]}
+            assert checks["gh"]["status"] == "pass", checks["gh"]
+            print("PASS: Codexify Doctor finds a usable GitHub CLI")
             assert docker("exec", container, "id", "-u").stdout.strip() == "1000"
             docker("exec", container, "sh", "-ec", """
                 grep -Eq '^CapEff:[[:space:]]+0+$' /proc/self/status
