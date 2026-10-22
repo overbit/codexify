@@ -67,9 +67,7 @@ def main(image):
             assert docker("run", "--rm", "--network", "none", image, check=False).returncode != 0
             version = docker("run", "--rm", "--network", "none", "--entrypoint",
                              "/usr/local/bin/tunnel-client-runtime", image, "--version")
-            # The archive release tag and executable's internal version differ.
-            # install-tunnel.sh verifies the exact archive with its pinned SHA-256;
-            # here verify that the packaged executable actually runs on this CPU.
+            # Archive SHA-256 pins the release; --version exercises this CPU's binary.
             version_text = (version.stdout + version.stderr).strip()
             assert version_text, "The bundled tunnel executable produced no version output"
             print(f"Bundled tunnel runtime: {version_text}", flush=True)
@@ -148,7 +146,15 @@ def main(image):
             assert rpc("tools/list", {}, 2)["tools"]
             print("PASS: unauthenticated MCP rejected; authenticated initialization and tool discovery succeed")
             docker("stop", "--time", "20", container)
-            assert docker("inspect", "--format", "{{.State.ExitCode}}", container).stdout.strip() == "0"
+            state = json.loads(docker("inspect", "--format", "{{json .State}}", container).stdout)
+            # The upstream HTTP-only path has no graceful-shutdown handler and
+            # normally exits 128 + SIGTERM. Tunnel mode has its own shutdown path.
+            # Accept normal termination, but never a forced SIGKILL (137), OOM,
+            # or another process failure. This is signal forwarding, not a live
+            # tunnel drain test.
+            assert state["ExitCode"] in (0, 143), state
+            assert not state["Running"] and not state["OOMKilled"] and not state["Error"], state
+            print(f"PASS: container stopped without SIGKILL (exit {state['ExitCode']})")
             docker("start", container)
             wait_healthy()
             docker("exec", container, "sh", "-ec", """
@@ -156,7 +162,7 @@ def main(image):
                 test "$(cat /workspace/smoke/persistence-check)" = persisted
                 git -C /workspace/smoke rev-parse --verify HEAD
             """)
-            print("PASS: graceful SIGTERM and persistent home/workspace after restart")
+            print("PASS: persistent home/workspace after restart")
             docker("run", "--rm", "--network", "none", "--read-only", "--user", "65532:65532",
                    "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true",
                    "--tmpfs", "/tmp:mode=1777", "--tmpfs", "/home/codexify:uid=65532,gid=65532",
