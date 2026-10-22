@@ -107,63 +107,43 @@ the installation is already up to date and never downgrades a newer version.
 
 #### Docker (headless MCP server)
 
-Use **Docker Engine with Compose v2** (or Docker Desktop with Linux containers)
-instead of installing the native CLI and background service. This runs the
-headless MCP tools and outbound OpenAI tunnel; the desktop/browser companion
-is not included.
+With **Docker Engine or Docker Desktop in Linux-container mode**, run the
+published image directly. No Git clone, Compose, `.env`, JSON editing, or
+host-folder setup is needed. Create a tunnel and scoped runtime key using the
+[manual tunnel setup guide](docs/REFERENCE.md#manual-native-openai-tunnel-setup),
+then replace the two placeholders:
 
 ```sh
-git clone https://github.com/overbit/codexify.git
-cd codexify
-umask 077
-mkdir -p "$HOME/.codexify/docker/home/.codexify" \
-         "$HOME/.codexify/docker/workspace" \
-         "$HOME/.codexify/docker/secrets"
-cp docker/example.env .env
-cp docker/codexify.config.json "$HOME/.codexify/docker/home/.codexify/codexify.config.json"
+docker run -d --name codexify --restart unless-stopped --pull=always \
+  --env CODEXIFY_TUNNEL_ID='REPLACE_WITH_YOUR_TUNNEL_ID' \
+  --env CODEXIFY_TUNNEL_API_KEY='REPLACE_WITH_YOUR_RUNTIME_KEY' \
+  --mount type=volume,src=codexify-home,dst=/home/codexify \
+  --mount type=volume,src=codexify-workspace,dst=/workspace \
+  --read-only --tmpfs /tmp:rw,nosuid,nodev,size=256m,mode=1777 \
+  --cap-drop ALL --security-opt no-new-privileges:true \
+  --pids-limit 256 --memory 2g --cpus 2 --stop-timeout 30 \
+  --log-opt max-size=10m --log-opt max-file=3 \
+  ghcr.io/overbit/codexify:latest
 ```
 
-By default, persistent state, projects, and the tunnel secret live under
-`$HOME/.codexify/docker/{home,workspace,secrets}` on the **host OS**, not
-inside the cloned repository. The whole host home is **not** mounted. Set
-`CODEXIFY_UID` / `CODEXIFY_GID` in `.env` to `id -u` / `id -g` on Linux.
-To use existing projects elsewhere, set `CODEXIFY_WORKSPACE` to their
-**absolute host path**. The selected user needs write access to state and
-workspace, and read access to the secret file.
+Docker creates the persistent home and workspace volumes automatically. The
+image creates the initial configuration and connects through the bundled
+outbound tunnel; no inbound ports or desktop/browser companion are required.
+Finish the ChatGPT connector setup in the tunnel guide, then use `/workspace`
+for projects. Inspect startup with `docker logs --tail=100 codexify`.
 
-Create an OpenAI Secure MCP Tunnel and a scoped runtime key using the
-[manual tunnel setup guide](docs/REFERENCE.md#manual-native-openai-tunnel-setup).
-Replace `REPLACE_WITH_YOUR_TUNNEL_ID` in
-`$HOME/.codexify/docker/home/.codexify/codexify.config.json`. Save the key as a private file
-(not in `.env` or Git); for example, in **Bash or Zsh**:
+**Credential trade-off:** a literal key in this command can remain in shell
+history, and Docker retains environment values in container metadata. Prefer
+an exported key with `--env CODEXIFY_TUNNEL_API_KEY` (no value), or a read-only
+key-file mount. The [single-command Docker guide](docs/DOCKER-RUN.md) explains
+both alternatives, persistence, upgrades, and image availability. The wrapper
+removes the environment key before launching Codexify, but this does not erase
+Docker metadata or hide the key file from same-user agent commands.
 
-```bash
-printf 'Tunnel runtime API key: '
-IFS= read -rs tunnel_key
-printf '\n'
-printf '%s\n' "$tunnel_key" > "$HOME/.codexify/docker/secrets/openai_tunnel_api_key"
-unset tunnel_key
-chmod 600 "$HOME/.codexify/docker/secrets/openai_tunnel_api_key"
-```
-
-Validate and start the container:
-
-```sh
-docker compose config --quiet
-docker compose pull
-docker compose run --rm codexify config validate
-docker compose up -d
-docker compose ps
-```
-
-If the GHCR image has not been published yet, build it with
-`docker build -t codexify:local .`, set `CODEXIFY_IMAGE=codexify:local` in
-`.env`, and skip `docker compose pull`. Docker does not use
-`codexify quickstart` or `codexify update`; finish the ChatGPT connector
-setup through the manual tunnel guide linked above. No inbound ports are
-required. Existing deployments with checkout-relative paths keep working if
-those paths are still set in `.env`; see the [Docker deployment guide](docs/DOCKER.md)
-for migration, permissions, troubleshooting, upgrades, and security limits.
+Existing configurations are never silently overwritten. Existing Compose and
+host-home deployments remain supported through the [advanced Docker guide](docs/DOCKER.md).
+Docker installations do not use `codexify quickstart` or `codexify update`;
+upgrades replace the image while retaining the volumes.
 
 ### 2. Connect to ChatGPT
 
@@ -625,7 +605,7 @@ Report reproducible bugs in [GitHub Issues](https://github.com/devnoname120/code
 | Looking for... | Read |
 | --- | --- |
 | Setup and usage guides | [Wiki](https://github.com/devnoname120/codexify/wiki) |
-| Docker installation and operations | [Docker deployment guide](docs/DOCKER.md) |
+| Docker installation and operations | [Single-command setup](docs/DOCKER-RUN.md) · [Advanced Compose deployment](docs/DOCKER.md) |
 | CLI options, configuration, and tool behavior | [Technical reference](docs/REFERENCE.md) |
 | Additional MCP servers and reusable workflows | [MCP bridging](docs/REFERENCE.md#bridging-other-mcp-servers) · [Skills](docs/REFERENCE.md#skills) |
 | Building or contributing | [Architecture](docs/ARCHITECTURE.md) · [Development commands](docs/REFERENCE.md#dev-commands) |
