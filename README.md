@@ -135,10 +135,11 @@ Create an OpenAI Secure MCP Tunnel and a scoped runtime key using the
 [manual tunnel setup guide](docs/REFERENCE.md#manual-native-openai-tunnel-setup).
 Replace `REPLACE_WITH_YOUR_TUNNEL_ID` in
 `$HOME/.codexify/docker/home/.codexify/codexify.config.json`. Save the key as a private file
-(not in `.env` or Git); for example, in **Bash**:
+(not in `.env` or Git); for example, in **Bash or Zsh**:
 
 ```bash
-read -r -s -p 'Tunnel runtime API key: ' tunnel_key
+printf 'Tunnel runtime API key: '
+IFS= read -rs tunnel_key
 printf '\n'
 printf '%s\n' "$tunnel_key" > "$HOME/.codexify/docker/secrets/openai_tunnel_api_key"
 unset tunnel_key
