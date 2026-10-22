@@ -124,7 +124,9 @@ Native tunnels are the default. Advanced deployments can replace `openaiTunnels`
 
 ## Operations and upgrades
 
-The health check probes the configured local `/health` endpoint without proxy environment variables. This tests **HTTP liveness, not remote tunnel readiness**. Codexify's tunnel supervisor handles readiness checks and failed tunnel processes. Docker's `unless-stopped` restarts exited containers, not merely unhealthy ones. Inspect logs and the real connector when diagnosing connectivity.
+The health check probes the configured local `/health` endpoint without proxy environment variables. This reports application readiness, including the server's supervised tunnel state in native tunnel mode; it is **not an end-to-end test of the ChatGPT connector**. Docker's `unless-stopped` restarts exited containers, not merely unhealthy ones. Inspect logs and the real connector when diagnosing connectivity.
+
+The init process forwards Docker's SIGTERM to the application. Upstream native tunnel mode has its own shutdown handler. The HTTP-only mode used by offline smoke tests currently terminates directly on SIGTERM and normally reports exit code 143; the tests reject forced SIGKILL, out-of-memory termination, and unrelated failures. They do not establish that in-flight tool commands or a live tunnel drain gracefully.
 
 Back up state and projects, retain the previous image digest, then update:
 
@@ -144,7 +146,7 @@ docker build -t codexify:test .
 python3 docker/test-image.py codexify:test
 ```
 
-The wrapper tests need Python 3, POSIX shell, jq, and curl. The image test requires Docker and runs without network access or real OpenAI credentials. It checks missing-configuration failure, the bundled tunnel executable, authenticated MCP initialization/tool discovery, rejected unauthenticated access, non-root identity, filesystem/capability restrictions, secret permissions, Git, persistent state after restart, graceful SIGTERM, and custom UID/GID configuration validation. It does not validate a live OpenAI tunnel or a browser session; verify your connector with a restricted project before production use.
+The wrapper tests need Python 3, POSIX shell, jq, and curl. The image test requires Docker and runs without network access or real OpenAI credentials. It checks missing-configuration failure, the bundled tunnel executable, authenticated MCP initialization/tool discovery, rejected unauthenticated access, non-root identity, filesystem/capability restrictions, secret permissions, Git, persistent state after restart, SIGTERM forwarding without forced termination, and custom UID/GID configuration validation. It does not validate a live OpenAI tunnel or a browser session; verify your connector with a restricted project before production use.
 
 The multi-stage build uses `cargo build --locked` and a versioned Rust builder. Base tags and distribution repositories remain mutable, so this is not a claim of bit-for-bit reproducibility. `RUST_IMAGE` and `RUNTIME_IMAGE` accept approved digest-pinned references. A tunnel version/hash mismatch with the Rust source fails the image build until its installer pins are updated.
 
