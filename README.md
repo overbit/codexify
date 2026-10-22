@@ -114,15 +114,13 @@ host-folder setup is needed. Create a tunnel and scoped runtime key using the
 then replace the two placeholders:
 
 ```sh
-docker run -d --name codexify --restart unless-stopped --pull=always \
-  --env CODEXIFY_TUNNEL_ID='REPLACE_WITH_YOUR_TUNNEL_ID' \
-  --env CODEXIFY_TUNNEL_API_KEY='REPLACE_WITH_YOUR_RUNTIME_KEY' \
-  --mount type=volume,src=codexify-home,dst=/home/codexify \
-  --mount type=volume,src=codexify-workspace,dst=/workspace \
+docker run -d --name codexify --restart unless-stopped \
+  -e CODEXIFY_TUNNEL_ID='REPLACE_WITH_YOUR_TUNNEL_ID' \
+  -e CODEXIFY_TUNNEL_API_KEY='REPLACE_WITH_YOUR_RUNTIME_KEY' \
+  -v codexify-home:/home/codexify -v codexify-workspace:/workspace \
   --read-only --tmpfs /tmp:rw,nosuid,nodev,size=256m,mode=1777 \
   --cap-drop ALL --security-opt no-new-privileges:true \
-  --pids-limit 256 --memory 2g --cpus 2 --stop-timeout 30 \
-  --log-opt max-size=10m --log-opt max-file=3 \
+  --memory 2g --pids-limit 256 --stop-timeout 30 --log-driver local \
   ghcr.io/overbit/codexify:latest
 ```
 
@@ -135,15 +133,16 @@ for projects. Inspect startup with `docker logs --tail=100 codexify`.
 **Credential trade-off:** a literal key in this command can remain in shell
 history, and Docker retains environment values in container metadata. Prefer
 an exported key with `--env CODEXIFY_TUNNEL_API_KEY` (no value), or a read-only
-key-file mount. The [single-command Docker guide](docs/DOCKER-RUN.md) explains
+key-file mount. The [Docker guide](docs/DOCKER.md) explains
 both alternatives, persistence, upgrades, and image availability. The wrapper
 removes the environment key before launching Codexify, but this does not erase
 Docker metadata or hide the key file from same-user agent commands.
 
-Existing configurations are never silently overwritten. Existing Compose and
-host-home deployments remain supported through the [advanced Docker guide](docs/DOCKER.md).
-Docker installations do not use `codexify quickstart` or `codexify update`;
-upgrades replace the image while retaining the volumes.
+The image already runs non-root and includes GitHub CLI (`gh`). The remaining
+flags keep a read-only root, private temporary storage, dropped capabilities,
+memory/process limits, and automatically rotated logs. Existing configurations
+are never silently overwritten. Docker installations do not use `codexify quickstart`
+or `codexify update`; upgrades replace the image while retaining the volumes.
 
 ### 2. Connect to ChatGPT
 
@@ -605,7 +604,7 @@ Report reproducible bugs in [GitHub Issues](https://github.com/devnoname120/code
 | Looking for... | Read |
 | --- | --- |
 | Setup and usage guides | [Wiki](https://github.com/devnoname120/codexify/wiki) |
-| Docker installation and operations | [Single-command setup](docs/DOCKER-RUN.md) · [Advanced Compose deployment](docs/DOCKER.md) |
+| Docker installation and operations | [Docker guide](docs/DOCKER.md) |
 | CLI options, configuration, and tool behavior | [Technical reference](docs/REFERENCE.md) |
 | Additional MCP servers and reusable workflows | [MCP bridging](docs/REFERENCE.md#bridging-other-mcp-servers) · [Skills](docs/REFERENCE.md#skills) |
 | Building or contributing | [Architecture](docs/ARCHITECTURE.md) · [Development commands](docs/REFERENCE.md#dev-commands) |
