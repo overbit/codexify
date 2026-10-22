@@ -26,10 +26,12 @@ esac
 # Keep Codexify's strict file-key permissions instead of weakening its validator.
 secret_file="${CODEXIFY_TUNNEL_API_KEY_FILE:-/run/secrets/openai_tunnel_api_key}"
 if [ -e "$secret_file" ]; then
-    [ -f "$secret_file" ] && [ -r "$secret_file" ] || fail 'Tunnel secret must be a readable regular file.'
+    if [ ! -f "$secret_file" ] || [ ! -r "$secret_file" ]; then
+        fail 'Tunnel secret must be a readable regular file.'
+    fi
     secret_dir="${TMPDIR:-/tmp}/codexify-secrets"
     [ ! -L "$secret_dir" ] || fail 'Private secret directory must not be a symlink.'
-    mkdir -p -m 700 "$secret_dir"
+    mkdir -p "$secret_dir"
     chmod 700 "$secret_dir"
     secret_tmp=$(mktemp "$secret_dir/key.XXXXXX")
     trap 'rm -f "$secret_tmp"' 0
