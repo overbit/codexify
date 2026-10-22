@@ -1,6 +1,6 @@
 services:
   codexify:
-    image: ${CODEXIFY_IMAGE:-ghcr.io/overbit/codexify:latest}
+    image: ${CODEXIFY_IMAGE:-ghcr.io/overbit/codexify:edge}
     user: "${CODEXIFY_UID:-1000}:${CODEXIFY_GID:-1000}"
     restart: unless-stopped
     read_only: true
