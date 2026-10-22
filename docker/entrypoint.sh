@@ -29,8 +29,8 @@ case "${1:-}" in
         done ;;
 esac
 
-# Compose file-backed secrets do not consistently support uid/mode overrides.
-# Keep Codexify's strict file-key permissions instead of weakening its validator.
+# Mounted key files can have different permissions on the host. Make a private
+# copy rather than weakening Codexify's strict file-key validator.
 secret_file="${CODEXIFY_TUNNEL_API_KEY_FILE:-/run/secrets/openai_tunnel_api_key}"
 secret_dir="${TMPDIR:-/tmp}/codexify-secrets"
 secret_ready=false
