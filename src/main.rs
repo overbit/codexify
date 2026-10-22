@@ -6,7 +6,7 @@ use serde::Serialize;
 
 use anyhow::Context;
 use codexify::config::{
-    BrowserCommand, Cli, CliCommand, ProjectsCommand, ProjectsListArgs, ServiceCommand,
+    BrowserCommand, Cli, CliCommand, GithubCommand, ProjectsCommand, ProjectsListArgs, ServiceCommand,
     config_path_for_quickstart, config_path_for_service, load_config, load_config_quiet,
     load_config_quiet_read_only, load_project_catalog_for_cli,
 };
@@ -234,6 +234,9 @@ async fn run(mut cli: Cli) -> anyhow::Result<()> {
                 }
                 return Ok(());
             }
+            CliCommand::Github { command } => {
+                return run_github(command);
+            }
             CliCommand::Projects {
                 command: ProjectsCommand::List(args),
             } => {
@@ -294,6 +297,110 @@ async fn run(mut cli: Cli) -> anyhow::Result<()> {
     start_http_server(config)
         .await
         .context("start Codexify server")
+}
+
+fn run_github(command: GithubCommand) -> anyhow::Result<()> {
+    use std::io::IsTerminal;
+
+    if matches!(&command, GithubCommand::Login) && !std::io::stdin().is_terminal() {
+        anyhow::bail!(
+            "GitHub login requires an interactive terminal. For Docker, run: docker exec -it codexify codexify github login"
+        );
+    }
+    run_github_with_binary(command, std::ffi::OsStr::new("gh"))
+}
+
+fn run_github_with_binary(command: GithubCommand, binary: &std::ffi::OsStr) -> anyhow::Result<()> {
+    let run = |arguments: &[&str]| -> anyhow::Result<()> {
+        let status = std::process::Command::new(binary)
+            .args(arguments)
+            .env_remove("CODEXIFY_TUNNEL_API_KEY")
+            .status()
+            .context("run GitHub CLI (gh); install it first if unavailable")?;
+        if !status.success() {
+            anyhow::bail!("GitHub CLI command failed with {status}");
+        }
+        Ok(())
+    };
+
+    match command {
+        GithubCommand::Login => {
+            println!("GitHub sign-in: copy the device code shown below and authorize it in your browser.");
+            run(&[
+                "auth", "login", "--hostname", "github.com",
+                "--git-protocol", "https", "--web",
+            ])?;
+            run(&["auth", "setup-git", "--hostname", "github.com"])?;
+            println!("GitHub CLI is authenticated; HTTPS Git credentials are configured.");
+            Ok(())
+        }
+        GithubCommand::Status => run(&["auth", "status", "--hostname", "github.com"]),
+    }
+}
+
+#[cfg(all(test, unix))]
+mod github_cli_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    fn fake_gh(directory: &std::path::Path, login_exit: i32) -> std::path::PathBuf {
+        let binary = directory.join("gh");
+        let trace = directory.join("gh-calls");
+        let script = format!(
+            "#!/bin/sh\nif env | grep -q '^CODEXIFY_TUNNEL_API_KEY='; then exit 99; fi\nprintf '%s\\n' \"$*\" >> \"{}\"\ncase \"$1 $2\" in\n  'auth login') exit {};;\nesac\nexit 0\n",
+            trace.display(),
+            login_exit
+        );
+        std::fs::write(&binary, script).unwrap();
+        std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o755)).unwrap();
+        binary
+    }
+
+    #[test]
+    fn github_command_parses_login_and_status() {
+        assert!(matches!(
+            Cli::try_parse_from(["codexify", "github", "login"]).unwrap().command,
+            Some(CliCommand::Github { command: GithubCommand::Login })
+        ));
+        assert!(matches!(
+            Cli::try_parse_from(["codexify", "github", "status"]).unwrap().command,
+            Some(CliCommand::Github { command: GithubCommand::Status })
+        ));
+    }
+
+    #[test]
+    fn successful_login_configures_git_after_authentication() {
+        let dir = tempfile::tempdir().unwrap();
+        let binary = fake_gh(dir.path(), 0);
+        run_github_with_binary(GithubCommand::Login, binary.as_os_str()).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("gh-calls")).unwrap(),
+            "auth login --hostname github.com --git-protocol https --web\n\
+             auth setup-git --hostname github.com\n"
+        );
+    }
+
+    #[test]
+    fn failed_login_does_not_configure_git() {
+        let dir = tempfile::tempdir().unwrap();
+        let binary = fake_gh(dir.path(), 12);
+        assert!(run_github_with_binary(GithubCommand::Login, binary.as_os_str()).is_err());
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("gh-calls")).unwrap(),
+            "auth login --hostname github.com --git-protocol https --web\n"
+        );
+    }
+
+    #[test]
+    fn status_is_read_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let binary = fake_gh(dir.path(), 0);
+        run_github_with_binary(GithubCommand::Status, binary.as_os_str()).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("gh-calls")).unwrap(),
+            "auth status --hostname github.com\n"
+        );
+    }
 }
 
 async fn run_browser(cli: Cli, command: BrowserCommand) -> anyhow::Result<()> {

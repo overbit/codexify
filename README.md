@@ -144,6 +144,13 @@ memory/process limits, and automatically rotated logs. Existing configurations
 are never silently overwritten. Docker installations do not use `codexify quickstart`
 or `codexify update`; upgrades replace the image while retaining the volumes.
 
+To sign in to GitHub for repository access, run
+`docker exec -it codexify codexify github login` and authorize the displayed
+device code in your browser. Check the account with
+`docker exec codexify codexify github status`. Credentials and Git settings are
+saved in the persistent `codexify-home` volume; see the
+[GitHub authentication instructions](docs/DOCKER.md#github-authentication).
+
 ### 2. Connect to ChatGPT
 
 For a **native installation**, run the setup wizard (Docker users should skip it):
