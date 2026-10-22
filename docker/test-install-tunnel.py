@@ -18,6 +18,7 @@ class TunnelInstallerTests(unittest.TestCase):
         self.archive = self.root / "release.zip"
         with zipfile.ZipFile(self.archive, "w") as archive:
             archive.writestr("tunnel-client-runtime", "test binary")
+            archive.writestr("THIRD_PARTY_LICENSES.txt", "third-party notice")
             for name in ("LICENSE", "NOTICE", "tunnel-client-runtime-linux-amd64-licenses.txt",
                          "tunnel-client-runtime-linux-arm64-licenses.txt"):
                 archive.writestr(name, "test notice")
@@ -56,8 +57,32 @@ exit 1
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(self.binary.read_text(), "test binary")
                 self.assertTrue(os.access(self.binary, os.X_OK))
+                self.assertFalse((self.output / "tunnel-licenses" / "tunnel-client-runtime").exists())
+                self.assertEqual((self.output / "tunnel-licenses" / "THIRD_PARTY_LICENSES.txt").read_text(),
+                                 "third-party notice")
                 for name in ("LICENSE", "NOTICE", f"tunnel-client-runtime-linux-{arch}-licenses.txt"):
                     self.assertEqual((self.output / "tunnel-licenses" / name).read_text(), "test notice")
+
+    def test_archive_does_not_need_an_architecture_named_license_report(self):
+        with zipfile.ZipFile(self.archive, "w") as archive:
+            archive.writestr("tunnel-client-runtime", "test binary")
+            for name in ("LICENSE", "NOTICE", "THIRD_PARTY_LICENSES.txt"):
+                archive.writestr(name, "test notice")
+        checksum = hashlib.sha256(self.archive.read_bytes()).hexdigest()
+        self.source.write_text(self.source.read_text().replace(self.checksum, checksum))
+        result = self.install()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.output / "tunnel-licenses" / "THIRD_PARTY_LICENSES.txt").read_text(),
+                         "test notice")
+
+    def test_missing_primary_license_fails_before_installing(self):
+        with zipfile.ZipFile(self.archive, "w") as archive:
+            archive.writestr("tunnel-client-runtime", "test binary")
+            archive.writestr("NOTICE", "test notice")
+        checksum = hashlib.sha256(self.archive.read_bytes()).hexdigest()
+        self.source.write_text(self.source.read_text().replace(self.checksum, checksum))
+        self.assertNotEqual(self.install().returncode, 0)
+        self.assertFalse(self.binary.exists())
 
     def test_checksum_mismatch_fails_before_installing(self):
         self.source.write_text(self.source.read_text().replace(self.checksum, "0" * 64))

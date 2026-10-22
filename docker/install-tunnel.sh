@@ -22,11 +22,12 @@ curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
     "https://github.com/openai/tunnel-client/releases/download/v$version/tunnel-client-runtime-v$version-linux-$arch.zip" \
     --output "$archive"
 printf '%s  %s\n' "$checksum" "$archive" | sha256sum --check --status
-unzip -p "$archive" tunnel-client-runtime > "$destination"
-chmod 755 "$destination"
-# Preserve the notices shipped inside the checksum-verified release archive.
+# Keep every notice shipped in the verified archive. Release builds can rename
+# third-party license reports, so do not reconstruct their filenames here.
 license_dir="$(dirname "$destination")/tunnel-licenses"
 mkdir -p "$license_dir"
-for notice in LICENSE NOTICE "tunnel-client-runtime-linux-$arch-licenses.txt"; do
-    unzip -p "$archive" "$notice" > "$license_dir/$notice"
-done
+unzip -q -o "$archive" -d "$license_dir"
+[ -s "$license_dir/LICENSE" ]
+[ -s "$license_dir/NOTICE" ]
+mv -f "$license_dir/tunnel-client-runtime" "$destination"
+chmod 755 "$destination"
