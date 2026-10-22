@@ -1,4 +1,5 @@
 """Runtime wrapper tests; no Docker daemon or live OpenAI credentials required."""
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -150,6 +151,48 @@ class RuntimeTests(unittest.TestCase):
                 result = subprocess.run(["sh", str(ROOT / "healthcheck.sh")], env=self.env,
                                         text=True, capture_output=True)
                 self.assertNotEqual(result.returncode, 0)
+
+
+class MCPResponseTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        spec = importlib.util.spec_from_file_location("image_smoke", ROOT / "test-image.py")
+        cls.client = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.client)
+
+    def test_direct_json_response(self):
+        body = '{"jsonrpc":"2.0","id":1,"result":{"ok":true}}'
+        self.assertEqual(self.client.rpc_result(body, 1), {"ok": True})
+
+    def test_sse_priming_and_comments_are_ignored(self):
+        # rmcp emits an empty priming event before the actual response.
+        body = ': keepalive\n\nid: 0\ndata:\n\nevent: message\n'
+        body += 'data: {"jsonrpc":"2.0","method":"notifications/progress"}\n\n'
+        body += 'data: {"jsonrpc":"2.0","id":1,"result":{"ok":true}}\n\n'
+        self.assertEqual(self.client.rpc_result(body, 1), {"ok": True})
+
+    def test_sse_multiline_and_crlf(self):
+        for newline in ("\n", "\r\n"):
+            with self.subTest(newline=newline):
+                body = newline.join(('data: {"jsonrpc":"2.0",',
+                                     'data: "id":1,"result":{}}', '', ''))
+                self.assertEqual(self.client.rpc_result(body, 1), {})
+
+    def test_unrelated_response_is_skipped(self):
+        body = 'data: {"id":2,"result":"other"}\n\ndata:{"id":1,"result":null}\n'
+        self.assertIsNone(self.client.rpc_result(body, 1))
+
+    def test_missing_response_is_rejected(self):
+        for body in ("", "data:\n\n", '{"id":2,"result":{}}'):
+            with self.subTest(body=body):
+                with self.assertRaisesRegex(AssertionError, "No MCP response"):
+                    self.client.rpc_result(body, 1)
+
+    def test_errors_and_malformed_responses_are_rejected(self):
+        for body in ('{"id":1,"error":{"code":-32603}}', '{"id":1}', 'data: not json\n\n'):
+            with self.subTest(body=body):
+                with self.assertRaises(AssertionError):
+                    self.client.rpc_result(body, 1)
 
 
 if __name__ == "__main__":
