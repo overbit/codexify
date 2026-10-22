@@ -29,6 +29,7 @@ jobs:
           sh -n docker/install-tunnel.sh
           shellcheck docker/entrypoint.sh docker/healthcheck.sh docker/install-tunnel.sh
           python3 docker/test-runtime.py -v
+          python3 docker/test-compose.py -v
           python3 -m py_compile docker/test-image.py
           docker compose config --quiet
 
