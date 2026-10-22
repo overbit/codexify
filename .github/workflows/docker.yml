@@ -29,8 +29,9 @@ jobs:
           sh -n docker/install-tunnel.sh
           shellcheck docker/entrypoint.sh docker/healthcheck.sh docker/install-tunnel.sh
           python3 docker/test-runtime.py -v
+          python3 docker/test-bootstrap.py -v
           python3 docker/test-compose.py -v
-          python3 -m py_compile docker/test-image.py
+          python3 -m py_compile docker/test-image.py docker/test-bootstrap-image.py
           docker compose config --quiet
 
   image:
@@ -72,7 +73,9 @@ jobs:
           cache-from: type=gha,scope=container-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=container-${{ matrix.arch }}
       - name: Test the real image offline
-        run: python3 docker/test-image.py codexify:test
+        run: |
+          python3 docker/test-image.py codexify:test
+          python3 docker/test-bootstrap-image.py codexify:test
       - name: Log in to GHCR
         if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         env:
