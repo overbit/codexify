@@ -1,0 +1,17 @@
+# Allow only build inputs; never send local credentials, state, or repositories.
+**
+!Cargo.toml
+!Cargo.lock
+!codexify.config.example.json
+!src/
+!src/**
+!browser-companion/
+!browser-companion/model-fallback-order.json
+!docker/
+!docker/entrypoint.sh
+!docker/healthcheck.sh
+!docker/install-tunnel.sh
+!LICENSE
+!LICENSES/
+!LICENSES/**
+!THIRD_PARTY_NOTICES.md

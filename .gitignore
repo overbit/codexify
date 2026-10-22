@@ -13,3 +13,10 @@ node_modules/
 # Source archive drops (reference material, not part of the repo)
 *.zip
 /browser-companion/.browsers/
+
+# Local container deployment state and credentials
+/.env
+/.env.*
+/state/
+/workspace/
+/secrets/
