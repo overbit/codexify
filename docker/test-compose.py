@@ -40,8 +40,11 @@ class HomePathTests(unittest.TestCase):
         self.assertEqual(volumes["/workspace"], str(workspace))
         self.assertEqual(actual["secrets"]["openai_tunnel_api_key"]["file"], str(secret))
         self.assertNotIn(str(self.home), volumes.values())  # Never mount the whole home.
-        self.assertTrue(all(mount.get("bind", {}).get("create_host_path") is False
-                            for mount in service["volumes"]))
+        # Compose's normalized JSON can omit explicit false-valued fields.
+        # Check both the rendered bind mounts and the source safety setting.
+        self.assertTrue(all(mount["type"] == "bind" for mount in service["volumes"]))
+        self.assertEqual((REPO / "compose.yaml").read_text().count(
+            "create_host_path: false"), 2)
 
     def test_defaults_are_under_host_home(self):
         result = self.compose()
